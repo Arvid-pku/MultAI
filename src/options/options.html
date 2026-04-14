@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MultAI — settings</title>
+  <link rel="icon" type="image/svg+xml" href="../../assets/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Inter:wght@400;500&family=JetBrains+Mono&display=swap">
+  <link rel="stylesheet" href="../shared/design-tokens.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <h1>MultAI settings</h1>
+      <p class="muted">Everything runs locally. No server, no telemetry.</p>
+    </header>
+
+    <section>
+      <h2>Plans</h2>
+      <p class="muted">
+        Auto-detected from each site's model picker on first load. Re-detects whenever a site's
+        options change. Edit manually if anything is wrong.
+      </p>
+      <div id="plans" class="plans-grid"></div>
+    </section>
+
+    <section>
+      <h2>Crew</h2>
+      <p class="muted">Which providers start active. Others stay on the bench.</p>
+      <div id="crew-config" class="crew-config"></div>
+    </section>
+
+    <section>
+      <h2>Data</h2>
+      <div class="actions">
+        <button type="button" class="btn-ghost" id="reset-crew">Reset crew to default</button>
+        <button type="button" class="btn-ghost btn-danger" id="clear-data">Clear all multai data</button>
+      </div>
+      <p class="muted small">
+        This only clears MultAI's own settings and detected plans. Your chats on each provider's
+        website are untouched.
+      </p>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

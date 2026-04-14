@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "responseHeaders": [
+        { "header": "x-frame-options", "operation": "remove" },
+        { "header": "content-security-policy", "operation": "remove" },
+        { "header": "content-security-policy-report-only", "operation": "remove" },
+        { "header": "x-content-security-policy", "operation": "remove" },
+        { "header": "x-webkit-csp", "operation": "remove" },
+        { "header": "cross-origin-opener-policy", "operation": "remove" },
+        { "header": "cross-origin-embedder-policy", "operation": "remove" },
+        { "header": "cross-origin-resource-policy", "operation": "remove" },
+        { "header": "permissions-policy", "operation": "remove" }
+      ]
+    },
+    "condition": {
+      "requestDomains": [
+        "chatgpt.com",
+        "claude.ai",
+        "gemini.google.com",
+        "grok.com",
+        "deepseek.com",
+        "qwen.ai",
+        "meta.ai"
+      ],
+      "resourceTypes": ["main_frame", "sub_frame"]
+    }
+  }
+]

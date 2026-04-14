@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Chrome extension build artifacts
+_metadata/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+.idea/
+.vscode/
+*.swp

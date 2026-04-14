@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MultAI</title>
+  <link rel="icon" type="image/svg+xml" href="../../assets/icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../assets/icons/icon32.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono&display=swap">
+  <link rel="stylesheet" href="../shared/design-tokens.css">
+  <link rel="stylesheet" href="cockpit.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="../../assets/icon.svg" alt="">
+      <h1>MultAI</h1>
+      <span class="brand-subtitle">one prompt, many minds</span>
+    </div>
+    <nav class="topnav">
+      <button type="button" class="link" data-action="compare" title="Compare responses (Cmd+Shift+C)">Compare</button>
+      <button type="button" class="link" data-action="open-settings">Settings</button>
+    </nav>
+  </header>
+
+  <section class="controls">
+    <div class="control-row">
+      <span class="control-label">Crew</span>
+      <div class="crew" id="crew"></div>
+    </div>
+
+    <div class="control-row">
+      <span class="control-label">Preset</span>
+      <div class="preset-picker" id="preset-picker"></div>
+      <button type="button" class="btn-ghost" data-action="apply-preset">Apply</button>
+    </div>
+
+    <div class="control-row master-row">
+      <span class="control-label">Master</span>
+      <div class="master-group">
+        <span class="master-label">Thinking</span>
+        <button type="button" class="chip" data-master="thinking" data-value="on">all on</button>
+        <button type="button" class="chip" data-master="thinking" data-value="off">all off</button>
+        <button type="button" class="chip is-active" data-master="thinking" data-value="pane">per pane</button>
+      </div>
+      <div class="master-group">
+        <span class="master-label">Tools</span>
+        <button type="button" class="chip" data-master="tools" data-value="on">all on</button>
+        <button type="button" class="chip" data-master="tools" data-value="off">all off</button>
+        <button type="button" class="chip is-active" data-master="tools" data-value="pane">per pane</button>
+      </div>
+      <div class="master-group">
+        <button type="button" class="chip" id="blind-toggle" title="Toggle blind mode (Cmd+B)">Blind mode · off</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="prompt-area" id="prompt-area">
+    <label for="prompt" class="sr-only">Prompt</label>
+    <div class="attachments" id="attachments" hidden></div>
+    <textarea id="prompt" placeholder="Ask the crew" rows="3"></textarea>
+    <div class="prompt-footer">
+      <div class="prompt-footer-left">
+        <button type="button" class="link" id="attach-btn">Attach</button>
+        <button type="button" class="link" id="library-btn" title="Prompt library (Cmd+/)">Library</button>
+        <span class="hint">drop, paste, or click Attach</span>
+      </div>
+      <div class="prompt-footer-right">
+        <span class="hint">Cmd · Enter to send</span>
+        <button type="button" class="btn-primary" id="send">Send</button>
+      </div>
+    </div>
+    <input type="file" id="file-input" multiple hidden>
+  </section>
+
+  <section class="grid" id="grid" aria-label="Active providers"></section>
+
+  <aside class="bench" id="bench" aria-label="Bench"></aside>
+
+  <!-- Prompt library popup -->
+  <div class="library-popup" id="library-popup" hidden role="dialog" aria-label="Prompt library">
+    <header class="library-header">
+      <h3>Prompts</h3>
+      <div class="library-actions">
+        <button type="button" class="btn-ghost" id="library-save">Save current</button>
+        <button type="button" class="link" id="library-close">Close</button>
+      </div>
+    </header>
+    <ul class="library-list" id="library-list"></ul>
+  </div>
+
+  <!-- Compare drawer -->
+  <div class="drawer" id="compare-drawer" hidden role="dialog" aria-label="Compare responses">
+    <header class="drawer-header">
+      <div>
+        <h2>Compare responses</h2>
+        <span class="drawer-subtitle">the latest assistant message from each active pane</span>
+      </div>
+      <div class="drawer-actions">
+        <button type="button" class="link" id="compare-refresh">Refresh</button>
+        <button type="button" class="btn-ghost" id="compare-export">Export markdown</button>
+        <button type="button" class="link" id="compare-close">Close</button>
+      </div>
+    </header>
+    <div class="drawer-body" id="compare-body"></div>
+  </div>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <script type="module" src="cockpit.js"></script>
+</body>
+</html>

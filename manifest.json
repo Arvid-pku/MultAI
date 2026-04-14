@@ -1,0 +1,128 @@
+{
+  "manifest_version": 3,
+  "name": "MultAI",
+  "version": "0.1.0",
+  "description": "Ask multiple AI chat sites in parallel from one cockpit.",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "action": {
+    "default_title": "MultAI — open cockpit",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "32": "assets/icons/icon32.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "tabs",
+    "scripting",
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://*.chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://*.claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://grok.com/*",
+    "https://*.grok.com/*",
+    "https://chat.deepseek.com/*",
+    "https://*.deepseek.com/*",
+    "https://chat.qwen.ai/*",
+    "https://*.qwen.ai/*",
+    "https://meta.ai/*",
+    "https://*.meta.ai/*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "iframe-headers",
+        "enabled": true,
+        "path": "rules/iframe-headers.json"
+      }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://*.chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://*.claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://grok.com/*",
+        "https://*.grok.com/*",
+        "https://chat.deepseek.com/*",
+        "https://*.deepseek.com/*",
+        "https://chat.qwen.ai/*",
+        "https://*.qwen.ai/*",
+        "https://meta.ai/*",
+        "https://*.meta.ai/*"
+      ],
+      "js": ["src/shared/anti-framebust.js"],
+      "all_frames": true,
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://chatgpt.com/*", "https://*.chatgpt.com/*"],
+      "js": ["src/providers/chatgpt/content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://claude.ai/*", "https://*.claude.ai/*"],
+      "js": ["src/providers/_runtime.js", "src/providers/claude/content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["src/providers/_runtime.js", "src/providers/gemini/content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://grok.com/*", "https://*.grok.com/*"],
+      "js": ["src/providers/_runtime.js", "src/providers/grok/content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*", "https://*.deepseek.com/*"],
+      "js": ["src/providers/_runtime.js", "src/providers/deepseek/content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.qwen.ai/*", "https://*.qwen.ai/*"],
+      "js": ["src/providers/_runtime.js", "src/providers/qwen/content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://meta.ai/*", "https://*.meta.ai/*"],
+      "js": ["src/providers/_runtime.js", "src/providers/meta/content.js"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src 'self' https://chatgpt.com https://*.chatgpt.com https://claude.ai https://*.claude.ai https://gemini.google.com https://grok.com https://*.grok.com https://chat.deepseek.com https://*.deepseek.com https://chat.qwen.ai https://*.qwen.ai https://meta.ai https://*.meta.ai"
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  }
+}
