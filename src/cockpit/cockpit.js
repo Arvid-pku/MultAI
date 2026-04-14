@@ -13,7 +13,8 @@ const state = {
   master: { thinking: 'pane', tools: 'pane' },
   paneSettings: {},
   paneChat: {},
-  benchCollapsed: false
+  benchCollapsed: false,
+  layout: null
 };
 
 const panes = {};                 // { [providerId]: { iframe, ready, state } }
@@ -108,11 +109,145 @@ function renderMaster() {
   }
 }
 
+/* ---------- Layout tree ----------
+ * A layout is a binary tree.
+ *   leaf:  { t: 'l', id }
+ *   split: { t: 's', d: 'row' | 'col', r: 0..1, c: [childA, childB] }
+ * `d: 'row'` lays children side-by-side (vertical splitter between).
+ * `d: 'col'` stacks children top-to-bottom (horizontal splitter between).
+ * `r` is the flex fraction given to the first child; second gets 1 - r.
+ */
+
+function layoutCollectIds(node) {
+  if (!node) return [];
+  if (node.t === 'l') return [node.id];
+  return [...layoutCollectIds(node.c[0]), ...layoutCollectIds(node.c[1])];
+}
+
+function buildDefaultLayout(ids, dir = 'row') {
+  if (ids.length === 0) return null;
+  if (ids.length === 1) return { t: 'l', id: ids[0] };
+  const mid = Math.ceil(ids.length / 2);
+  const nextDir = dir === 'row' ? 'col' : 'row';
+  return {
+    t: 's',
+    d: dir,
+    r: mid / ids.length,
+    c: [
+      buildDefaultLayout(ids.slice(0, mid), nextDir),
+      buildDefaultLayout(ids.slice(mid), nextDir)
+    ]
+  };
+}
+
+function layoutRemoveLeaf(node, id) {
+  if (!node) return null;
+  if (node.t === 'l') return node.id === id ? null : node;
+  const a = layoutRemoveLeaf(node.c[0], id);
+  const b = layoutRemoveLeaf(node.c[1], id);
+  if (!a) return b;
+  if (!b) return a;
+  return { ...node, c: [a, b] };
+}
+
+function layoutFindLargestLeaf(node) {
+  let best = { path: [], area: -1 };
+  function walk(n, path, area) {
+    if (n.t === 'l') {
+      if (area > best.area) best = { path, area };
+      return;
+    }
+    walk(n.c[0], [...path, 0], area * n.r);
+    walk(n.c[1], [...path, 1], area * (1 - n.r));
+  }
+  walk(node, [], 1);
+  return best.path;
+}
+
+function layoutAtPath(node, path) {
+  let cur = node;
+  for (const idx of path) cur = cur.c[idx];
+  return cur;
+}
+
+function layoutUpdateAt(node, path, updater) {
+  if (path.length === 0) return updater(node);
+  const [head, ...rest] = path;
+  const newChildren = node.c.slice();
+  newChildren[head] = layoutUpdateAt(node.c[head], rest, updater);
+  return { ...node, c: newChildren };
+}
+
+function layoutAddLeaf(node, id) {
+  if (!node) return { t: 'l', id };
+  const path = layoutFindLargestLeaf(node);
+  // Alternate direction by depth so nested splits don't all go the same way.
+  const parentPath = path.slice(0, -1);
+  let parentDir = null;
+  if (parentPath.length > 0) {
+    const parent = layoutAtPath(node, parentPath);
+    if (parent.t === 's') parentDir = parent.d;
+  }
+  const newDir = parentDir === 'row' ? 'col' : 'row';
+  return layoutUpdateAt(node, path, (leafNode) => ({
+    t: 's',
+    d: newDir,
+    r: 0.5,
+    c: [leafNode, { t: 'l', id }]
+  }));
+}
+
+function layoutSwap(node, idA, idB) {
+  if (node.t === 'l') {
+    if (node.id === idA) return { t: 'l', id: idB };
+    if (node.id === idB) return { t: 'l', id: idA };
+    return node;
+  }
+  return { ...node, c: [layoutSwap(node.c[0], idA, idB), layoutSwap(node.c[1], idA, idB)] };
+}
+
+function syncLayoutWithCrew(layout, crewIds) {
+  if (crewIds.length === 0) return null;
+  if (!layout) return buildDefaultLayout(crewIds);
+
+  const currentIds = layoutCollectIds(layout);
+  const currentSet = new Set(currentIds);
+  const newSet = new Set(crewIds);
+
+  // Remove ids no longer in crew
+  let result = layout;
+  for (const id of currentIds) {
+    if (!newSet.has(id)) {
+      result = layoutRemoveLeaf(result, id);
+      if (!result) break;
+    }
+  }
+  if (!result) return buildDefaultLayout(crewIds);
+
+  // Add new ids (preserve crew order by adding in iteration order)
+  for (const id of crewIds) {
+    if (!currentSet.has(id)) {
+      result = layoutAddLeaf(result, id);
+    }
+  }
+
+  return result;
+}
+
+function resetLayout() {
+  state.layout = buildDefaultLayout(state.crew);
+  saveState();
+  renderGrid();
+}
+
+/* ---------- Render grid ---------- */
+
 function renderGrid() {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
   grid.setAttribute('data-count', String(state.crew.length));
   grid.classList.toggle('is-blind', blindMode);
+  grid.classList.remove('is-dragging');
 
   // Drop pane entries for providers no longer active
   for (const id of Object.keys(panes)) {
@@ -120,22 +255,149 @@ function renderGrid() {
   }
 
   if (state.crew.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'pane';
-    empty.innerHTML = `
+    const host = document.createElement('div');
+    host.className = 'pane-placeholder-host';
+    host.innerHTML = `
       <div class="pane-placeholder">
         <strong>No providers active.</strong>
         <span>Click any name in the Crew row above to activate it.</span>
       </div>
     `;
-    grid.appendChild(empty);
+    grid.appendChild(host);
+    state.layout = null;
     return;
   }
 
-  for (const id of state.crew) {
-    const provider = getProvider(id);
-    if (provider) grid.appendChild(createPane(provider));
+  state.layout = syncLayoutWithCrew(state.layout, state.crew);
+  grid.appendChild(renderLayoutNode(state.layout, []));
+}
+
+function renderLayoutNode(node, path) {
+  if (node.t === 'l') {
+    const provider = getProvider(node.id);
+    if (!provider) {
+      const missing = document.createElement('div');
+      missing.className = 'pane';
+      return missing;
+    }
+    const pane = createPane(provider);
+    attachPaneSwapHandlers(pane, node.id);
+    return pane;
   }
+
+  const wrap = document.createElement('div');
+  wrap.className = `split split-${node.d}`;
+
+  const first = renderLayoutNode(node.c[0], [...path, 0]);
+  first.style.flex = String(node.r);
+
+  const splitter = document.createElement('div');
+  splitter.className = 'splitter';
+  splitter.dataset.dir = node.d;
+  splitter.dataset.path = path.join('.');
+  splitter.addEventListener('mousedown', (e) => startSplitterDrag(e, node.d, path.slice()));
+
+  const second = renderLayoutNode(node.c[1], [...path, 1]);
+  second.style.flex = String(1 - node.r);
+
+  wrap.append(first, splitter, second);
+  return wrap;
+}
+
+/* ---------- Splitter drag ---------- */
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function startSplitterDrag(e, dir, path) {
+  e.preventDefault();
+  const grid = document.getElementById('grid');
+  const splitter = e.currentTarget;
+  const parent = splitter.parentElement;
+  if (!parent) return;
+
+  const rect = parent.getBoundingClientRect();
+  const splitterSize = dir === 'row' ? splitter.offsetWidth : splitter.offsetHeight;
+  const totalLength = (dir === 'row' ? rect.width : rect.height) - splitterSize;
+  if (totalLength <= 0) return;
+
+  const startPos = dir === 'row' ? e.clientX : e.clientY;
+  const startRatio = layoutAtPath(state.layout, path).r;
+
+  grid.classList.add('is-dragging');
+  splitter.classList.add('is-active');
+
+  // Find the two sibling elements to restyle on the fly
+  const siblings = Array.from(parent.children);
+  const splitterIdx = siblings.indexOf(splitter);
+  const before = siblings[splitterIdx - 1];
+  const after = siblings[splitterIdx + 1];
+
+  let latestRatio = startRatio;
+
+  function onMove(ev) {
+    const pos = dir === 'row' ? ev.clientX : ev.clientY;
+    const delta = pos - startPos;
+    const newRatio = clamp(startRatio + delta / totalLength, 0.1, 0.9);
+    latestRatio = newRatio;
+    if (before) before.style.flex = String(newRatio);
+    if (after) after.style.flex = String(1 - newRatio);
+  }
+
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    grid.classList.remove('is-dragging');
+    splitter.classList.remove('is-active');
+    if (latestRatio !== startRatio) {
+      state.layout = layoutUpdateAt(state.layout, path, (n) => ({ ...n, r: latestRatio }));
+      saveState();
+    }
+  }
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+/* ---------- Pane swap via drag ---------- */
+
+function attachPaneSwapHandlers(pane, providerId) {
+  const title = pane.querySelector('.pane-title');
+  if (title) {
+    title.setAttribute('draggable', 'true');
+    title.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('application/x-multai-pane', providerId);
+      e.dataTransfer.effectAllowed = 'move';
+      pane.classList.add('is-pane-dragging');
+      document.getElementById('grid').classList.add('is-dragging');
+    });
+    title.addEventListener('dragend', () => {
+      pane.classList.remove('is-pane-dragging');
+      document.getElementById('grid').classList.remove('is-dragging');
+      document.querySelectorAll('.pane.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
+    });
+  }
+
+  pane.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer.types.includes('application/x-multai-pane')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!pane.classList.contains('is-pane-dragging')) {
+      pane.classList.add('is-drop-target');
+    }
+  });
+  pane.addEventListener('dragleave', (e) => {
+    if (e.relatedTarget && pane.contains(e.relatedTarget)) return;
+    pane.classList.remove('is-drop-target');
+  });
+  pane.addEventListener('drop', (e) => {
+    const srcId = e.dataTransfer.getData('application/x-multai-pane');
+    pane.classList.remove('is-drop-target');
+    if (!srcId || srcId === providerId) return;
+    e.preventDefault();
+    state.layout = layoutSwap(state.layout, srcId, providerId);
+    saveState();
+    renderGrid();
+  });
 }
 
 function createPane(provider) {
@@ -956,6 +1218,7 @@ document.getElementById('library-save').addEventListener('click', saveCurrentPro
 document.getElementById('library-close').addEventListener('click', closeLibrary);
 
 document.getElementById('blind-toggle').addEventListener('click', toggleBlind);
+document.getElementById('reset-layout').addEventListener('click', resetLayout);
 
 document.getElementById('compare-refresh').addEventListener('click', refreshCompare);
 document.getElementById('compare-export').addEventListener('click', exportCompareMarkdown);
