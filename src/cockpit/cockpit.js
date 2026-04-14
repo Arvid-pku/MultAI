@@ -346,11 +346,13 @@ function renderBench() {
   const bench = PROVIDERS.filter(p => !state.crew.includes(p.id));
   if (bench.length === 0) {
     el.classList.remove('is-collapsed');
+    document.body.dataset.benchState = 'empty';
     return;
   }
 
   const collapsed = !!state.benchCollapsed;
   el.classList.toggle('is-collapsed', collapsed);
+  document.body.dataset.benchState = collapsed ? 'collapsed' : 'expanded';
 
   const header = document.createElement('div');
   header.className = 'bench-header';
