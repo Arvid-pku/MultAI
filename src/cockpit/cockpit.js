@@ -12,7 +12,9 @@ const state = {
   benchCollapsed: false,
   controlsCollapsed: false,
   maxPerRow: 3,
-  rowHeights: []
+  rowHeights: [],
+  layoutMode: 'grid',   // 'grid' | 'tabs'
+  activeTab: null       // providerId shown in tabs mode
 };
 
 const DEFAULT_ROW_HEIGHT = 720;
@@ -64,10 +66,35 @@ async function saveLibrary() {
 function render() {
   renderCrew();
   renderPerRow();
+  renderLayoutMode();
   renderGrid();
   renderBench();
   applyControlsCollapsed();
 }
+
+function renderLayoutMode() {
+  const mode = state.layoutMode === 'tabs' ? 'tabs' : 'grid';
+  document.body.dataset.layoutMode = mode;
+  for (const chip of document.querySelectorAll('.chip[data-layout]')) {
+    chip.classList.toggle('is-active', chip.dataset.layout === mode);
+  }
+  requestAnimationFrame(updateGridOffset);
+}
+
+function updateGridOffset() {
+  const grid = document.getElementById('grid');
+  if (!grid) return;
+  if (state.layoutMode !== 'tabs') {
+    grid.style.removeProperty('--grid-offset');
+    return;
+  }
+  // Measure space above the grid so the tabs pane fills remaining viewport.
+  const top = grid.getBoundingClientRect().top + window.scrollY;
+  const bottomPadding = 24;
+  grid.style.setProperty('--grid-offset', `${Math.max(0, top + bottomPadding)}px`);
+}
+
+window.addEventListener('resize', () => requestAnimationFrame(updateGridOffset));
 
 function renderCrew() {
   const el = document.getElementById('crew');
@@ -99,9 +126,13 @@ function renderPerRow() {
 function renderGrid() {
   const grid = document.getElementById('grid');
   grid.classList.remove('is-dragging');
+  const tabsMode = state.layoutMode === 'tabs';
+  grid.classList.toggle('is-tabs-mode', tabsMode);
 
-  // Remove placeholder from previous empty state
+  // Remove placeholder and tab bar from previous render
   grid.querySelectorAll('.pane-placeholder-host').forEach(el => el.remove());
+  grid.querySelectorAll('.tab-bar').forEach(el => el.remove());
+  grid.querySelectorAll('.row-splitter').forEach(el => el.remove());
 
   // Drop panes for providers that no longer exist in PROVIDERS at all
   const validIds = new Set(PROVIDERS.map(p => p.id));
@@ -127,6 +158,7 @@ function renderGrid() {
     `;
     grid.appendChild(host);
     grid.style.setProperty('--cols', '1');
+    grid.style.gridTemplateRows = '';
     return;
   }
 
@@ -142,7 +174,25 @@ function renderGrid() {
     }
   }
 
-  // Show / hide based on crew membership and set grid order for crew panes
+  if (tabsMode) {
+    // Validate active tab, fall back to first crew member
+    if (!state.crew.includes(state.activeTab)) {
+      state.activeTab = state.crew[0];
+    }
+    renderTabBar(grid);
+
+    for (const id of Object.keys(panes)) {
+      const el = panes[id].element;
+      if (!el) continue;
+      el.style.order = '';
+      el.classList.toggle('is-hidden', id !== state.activeTab);
+    }
+    grid.style.setProperty('--cols', '1');
+    grid.style.gridTemplateRows = '';
+    return;
+  }
+
+  // Grid mode: show / hide based on crew membership and set grid order
   const maxCols = clamp(state.maxPerRow || 3, 1, 4);
   const cols = Math.min(maxCols, state.crew.length);
   grid.style.setProperty('--cols', String(cols));
@@ -163,6 +213,42 @@ function renderGrid() {
   syncRowHeights();
   applyGridTemplateRows();
   renderRowSplitters();
+}
+
+function renderTabBar(grid) {
+  const bar = document.createElement('div');
+  bar.className = 'tab-bar';
+  for (const id of state.crew) {
+    const provider = getProvider(id);
+    if (!provider) continue;
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'tab' + (id === state.activeTab ? ' is-active' : '');
+    tab.textContent = provider.label;
+    tab.title = provider.label;
+    tab.addEventListener('click', () => setActiveTab(id));
+    bar.appendChild(tab);
+  }
+  grid.prepend(bar);
+}
+
+function setActiveTab(providerId) {
+  if (state.activeTab === providerId) return;
+  state.activeTab = providerId;
+  saveState();
+  renderGrid();
+}
+
+function setLayoutMode(mode) {
+  const next = mode === 'tabs' ? 'tabs' : 'grid';
+  if (state.layoutMode === next) return;
+  state.layoutMode = next;
+  if (next === 'tabs' && !state.crew.includes(state.activeTab)) {
+    state.activeTab = state.crew[0] || null;
+  }
+  saveState();
+  renderLayoutMode();
+  renderGrid();
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -229,16 +315,13 @@ function startRowResizeDrag(e, rowIdx) {
 
   const startY = e.clientY;
   const startA = state.rowHeights[rowIdx];
-  const startB = state.rowHeights[rowIdx + 1];
 
   function onMove(ev) {
     const delta = ev.clientY - startY;
-    let newA = startA + delta;
-    let newB = startB - delta;
-    if (newA < MIN_ROW_HEIGHT) { newA = MIN_ROW_HEIGHT; newB = startA + startB - MIN_ROW_HEIGHT; }
-    if (newB < MIN_ROW_HEIGHT) { newB = MIN_ROW_HEIGHT; newA = startA + startB - MIN_ROW_HEIGHT; }
-    state.rowHeights[rowIdx] = newA;
-    state.rowHeights[rowIdx + 1] = newB;
+    const newH = Math.max(MIN_ROW_HEIGHT, startA + delta);
+    for (let i = 0; i < state.rowHeights.length; i++) {
+      state.rowHeights[i] = newH;
+    }
     applyGridTemplateRows();
     positionRowSplitters();
   }
@@ -506,6 +589,7 @@ function applyControlsCollapsed() {
   const controls = document.getElementById('controls');
   if (controls) controls.classList.toggle('is-collapsed', !!state.controlsCollapsed);
   const btn = document.getElementById('controls-toggle');
+  requestAnimationFrame(updateGridOffset);
   if (btn) {
     const collapsed = !!state.controlsCollapsed;
     btn.textContent = collapsed ? '▼' : '▲';
@@ -1055,6 +1139,10 @@ document.querySelector('[data-action="open-settings"]').addEventListener('click'
 
 for (const chip of document.querySelectorAll('.chip[data-per-row]')) {
   chip.addEventListener('click', () => setMaxPerRow(chip.dataset.perRow));
+}
+
+for (const chip of document.querySelectorAll('.chip[data-layout]')) {
+  chip.addEventListener('click', () => setLayoutMode(chip.dataset.layout));
 }
 
 document.querySelector('[data-action="compare"]')?.addEventListener('click', openCompare);
