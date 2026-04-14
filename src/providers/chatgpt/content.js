@@ -197,40 +197,9 @@
     location.assign(`/c/${chatId}`);
   }
 
-  async function readModels() {
-    const button = findFirst(S.modelPickerButton);
-    if (!button) return { current: null, available: [] };
-    const current = (button.textContent || '').trim();
-    button.click();
-    await waitFor(() => findAll(S.modelMenuItems).length > 0, 2000);
-    const items = findAll(S.modelMenuItems);
-    const available = items
-      .map(el => (el.textContent || '').trim().split('\n')[0].trim())
-      .filter(Boolean);
-    // Close the menu
-    document.body.click();
-    await wait(100);
-    return { current, available };
-  }
-
-  function inferPlan(models) {
-    const joined = models.join(' | ').toLowerCase();
-    if (joined.includes('gpt-5 pro') || joined.includes('o3 pro')) return 'Pro';
-    if (joined.includes('gpt-5') || joined.includes('o3') || joined.includes('gpt-4o') || joined.includes('o1')) return 'Plus';
-    if (models.length <= 2) return 'Free';
-    return 'Unknown';
-  }
-
   async function probe() {
-    let models = { current: null, available: [] };
-    try { models = await readModels(); } catch (_) { /* menu may be modal right now */ }
-    const threads = await readThreads().catch(() => []);
     return {
       ready: !!findFirst(S.promptInput),
-      currentModel: models.current,
-      availableModels: models.available,
-      plan: inferPlan(models.available),
-      threads,
       generating: !!findFirst(S.stopButton)
     };
   }

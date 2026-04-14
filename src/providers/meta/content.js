@@ -46,10 +46,6 @@
   async function probe() {
     return {
       ready: !!R.findFirst(S.promptInput),
-      currentModel: null,
-      availableModels: [],
-      plan: 'Free',
-      threads: [],
       generating: !!R.findFirst(S.stopButton)
     };
   }

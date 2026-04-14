@@ -90,15 +90,8 @@
   }
 
   async function probe() {
-    let models = { current: null, available: [] };
-    try { models = await readModels(); } catch (_) {}
-    const threads = await readThreads().catch(() => []);
     return {
       ready: !!R.findFirst(S.promptInput),
-      currentModel: models.current,
-      availableModels: models.available,
-      plan: inferPlan(models.available),
-      threads,
       generating: !!R.findFirst(S.stopButton)
     };
   }

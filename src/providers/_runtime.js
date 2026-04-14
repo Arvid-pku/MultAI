@@ -351,15 +351,20 @@
     buttonLabels = (buttonLabels || []).map(l => l.toLowerCase());
 
     const btn = await waitFor(() => {
-      const candidates = document.querySelectorAll('button, [role="button"], a');
+      // Only real buttons — policy / "manage cookies" links inside the banner
+      // are <a target="_blank"> and would open a new tab if clicked.
+      const candidates = document.querySelectorAll('button, [role="button"]');
       for (const el of candidates) {
         const text = (el.textContent || '').trim().toLowerCase();
-        if (!text) continue;
+        // Button labels are short; skip long "by continuing you agree" strings
+        // that match via includes() but aren't really dismiss buttons.
+        if (!text || text.length > 32) continue;
         if (!buttonLabels.some(l => text === l || text.includes(l))) continue;
-        // Require the button to be inside a container whose text mentions one
-        // of the keywords — guards against clicking random "Accept" links.
+        // Require an ancestor within a few levels whose text mentions one of
+        // the keywords. Walking too far risks hitting the page-wide text that
+        // happens to contain "cookie" somewhere.
         let p = el;
-        for (let i = 0; i < 10 && p; i++) {
+        for (let i = 0; i < 4 && p; i++) {
           const ptxt = (p.textContent || '').toLowerCase();
           if (keywords.some(k => ptxt.includes(k))) {
             const rect = el.getBoundingClientRect();

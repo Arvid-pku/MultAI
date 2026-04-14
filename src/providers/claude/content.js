@@ -29,15 +29,6 @@
       'form',
       'main'
     ],
-    modelPickerButton: [
-      'button[data-testid*="model"]',
-      'button[aria-label*="model" i]',
-      'button[aria-haspopup="menu"]'
-    ],
-    modelMenuItems: [
-      '[role="menu"] [role="menuitem"]',
-      '[role="menuitem"]'
-    ],
     newChatLink: [
       'a[href="/new"]',
       'a[aria-label*="New chat" i]'
@@ -52,54 +43,9 @@
     ]
   };
 
-  function inferPlan(models) {
-    const joined = models.join(' ').toLowerCase();
-    if (joined.includes('max')) return 'Max';
-    if (joined.includes('opus')) return 'Pro';
-    if (models.length <= 1) return 'Free';
-    return 'Unknown';
-  }
-
-  async function readModels() {
-    const button = R.findFirst(S.modelPickerButton);
-    if (!button) return { current: null, available: [] };
-    const current = (button.textContent || '').trim();
-    button.click();
-    await R.waitFor(() => R.findAll(S.modelMenuItems).length > 0, 1500);
-    const items = R.findAll(S.modelMenuItems);
-    const available = items.map(el => (el.textContent || '').trim().split('\n')[0].trim()).filter(Boolean);
-    document.body.click();
-    await R.wait(80);
-    return { current, available };
-  }
-
-  async function readThreads() {
-    const links = R.findAll(S.threadLinks);
-    const seen = new Set();
-    const threads = [];
-    for (const a of links) {
-      const href = a.getAttribute('href') || '';
-      const m = href.match(/\/chat\/([\w-]+)/);
-      if (!m) continue;
-      const id = m[1];
-      if (seen.has(id)) continue;
-      seen.add(id);
-      threads.push({ id, title: (a.textContent || '').trim().slice(0, 80) || 'Untitled', href });
-      if (threads.length >= 40) break;
-    }
-    return threads;
-  }
-
   async function probe() {
-    let models = { current: null, available: [] };
-    try { models = await readModels(); } catch (_) {}
-    const threads = await readThreads().catch(() => []);
     return {
       ready: !!R.findFirst(S.promptInput),
-      currentModel: models.current,
-      availableModels: models.available,
-      plan: inferPlan(models.available),
-      threads,
       generating: !!R.findFirst(S.stopButton)
     };
   }

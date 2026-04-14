@@ -29,14 +29,6 @@
       'main',
       'body'
     ],
-    modelPickerButton: [
-      'button[data-test-id="bard-mode-menu-button"]',
-      'bard-mode-switcher button',
-      'button[aria-haspopup="menu"]'
-    ],
-    modelMenuItems: [
-      '[role="menuitem"], [role="menuitemradio"]'
-    ],
     newChatLink: [
       'button[aria-label*="New chat" i]',
       'expandable-button[aria-label*="New chat" i] button',
@@ -50,34 +42,9 @@
     ]
   };
 
-  function inferPlan(models) {
-    const joined = models.join(' ').toLowerCase();
-    if (joined.includes('deep research') || joined.includes('2.5 pro') || joined.includes('ultra')) return 'Advanced';
-    return 'Free';
-  }
-
-  async function readModels() {
-    const button = R.findFirst(S.modelPickerButton);
-    if (!button) return { current: null, available: [] };
-    const current = (button.textContent || '').trim();
-    button.click();
-    await R.waitFor(() => R.findAll(S.modelMenuItems).length > 0, 1500);
-    const items = R.findAll(S.modelMenuItems);
-    const available = items.map(el => (el.textContent || '').trim().split('\n')[0].trim()).filter(Boolean);
-    document.body.click();
-    await R.wait(80);
-    return { current, available };
-  }
-
   async function probe() {
-    let models = { current: null, available: [] };
-    try { models = await readModels(); } catch (_) {}
     return {
       ready: !!R.findFirst(S.promptInput),
-      currentModel: models.current,
-      availableModels: models.available,
-      plan: inferPlan(models.available),
-      threads: [],
       generating: !!R.findFirst(S.stopButton)
     };
   }
