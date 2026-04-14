@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.svg" width="120" height="120" alt="MultAI logo — two stylized A's meeting to form an M">
+  <img src="assets/icon.svg" width="120" height="120" alt="MultAI">
 </p>
 
 <h1 align="center">MultAI</h1>
@@ -7,8 +7,6 @@
 <p align="center"><em>One prompt, many minds.</em></p>
 
 MultAI is a Chrome extension that lets you talk to seven AI chat sites at once — ChatGPT, Claude, Gemini, Grok, Meta AI, DeepSeek, and Qwen — from a single cockpit page.
-
-The logo is a ligature: two capital **A**'s that share their inner legs, so the middle valley reads as an **M**. Two A's, one M — AI × Multi, the whole idea of the project in two letters.
 
 [中文版 README](./README_zh.md)
 

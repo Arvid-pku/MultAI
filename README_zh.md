@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.svg" width="120" height="120" alt="MultAI 标志 —— 两个 A 相接形成一个 M">
+  <img src="assets/icon.svg" width="120" height="120" alt="MultAI">
 </p>
 
 <h1 align="center">MultAI</h1>
@@ -7,8 +7,6 @@
 <p align="center"><em>一个提示词，多个模型同时回答。</em></p>
 
 MultAI 是一个 Chrome 扩展，可以在同一个驾驶舱页面内同时与七个 AI 聊天网站对话：ChatGPT、Claude、Gemini、Grok、Meta AI、DeepSeek 和 Qwen。
-
-标志是一个连字设计：两个大写的 **A** 共用内侧的腿，于是中间的谷口自然读作一个 **M**。两个 A，一个 M —— AI × Multi，两个字母就把项目的想法说完了。
 
 [English README](./README.md)
 
