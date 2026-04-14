@@ -20,13 +20,22 @@
       <span class="brand-subtitle">one prompt, many minds</span>
     </div>
     <nav class="topnav">
-      <button type="button" class="link" data-action="new-conversation" title="Start a fresh conversation in every active pane">New conversation</button>
+      <button type="button" class="link" data-action="new-conversation" title="Start a fresh conversation in every active pane">New chat</button>
+      <button type="button" class="link" data-action="new-temporary-chat" title="Start a temporary / incognito chat in every pane that supports it">Temporary</button>
       <button type="button" class="link" data-action="compare" title="Compare responses (Cmd+Shift+C)">Compare</button>
+      <div class="topnav-per-row" title="Max panes per row">
+        <span class="topnav-label">Per row</span>
+        <button type="button" class="chip" data-per-row="1">1</button>
+        <button type="button" class="chip" data-per-row="2">2</button>
+        <button type="button" class="chip" data-per-row="3">3</button>
+        <button type="button" class="chip" data-per-row="4">4</button>
+      </div>
+      <button type="button" class="link icon-only" id="controls-toggle" title="Collapse controls" aria-label="Collapse controls">▲</button>
       <button type="button" class="link" data-action="open-settings">Settings</button>
     </nav>
   </header>
 
-  <section class="controls">
+  <section class="controls" id="controls">
     <div class="control-row">
       <span class="control-label">Crew</span>
       <div class="crew" id="crew"></div>
@@ -36,32 +45,6 @@
       <span class="control-label">Preset</span>
       <div class="preset-picker" id="preset-picker"></div>
       <button type="button" class="btn-ghost" data-action="apply-preset">Apply</button>
-    </div>
-
-    <div class="control-row master-row">
-      <span class="control-label">Master</span>
-      <div class="master-group">
-        <span class="master-label">Thinking</span>
-        <button type="button" class="chip" data-master="thinking" data-value="on">all on</button>
-        <button type="button" class="chip" data-master="thinking" data-value="off">all off</button>
-        <button type="button" class="chip is-active" data-master="thinking" data-value="pane">per pane</button>
-      </div>
-      <div class="master-group">
-        <span class="master-label">Tools</span>
-        <button type="button" class="chip" data-master="tools" data-value="on">all on</button>
-        <button type="button" class="chip" data-master="tools" data-value="off">all off</button>
-        <button type="button" class="chip is-active" data-master="tools" data-value="pane">per pane</button>
-      </div>
-      <div class="master-group">
-        <span class="master-label">Per row</span>
-        <button type="button" class="chip" data-per-row="1">1</button>
-        <button type="button" class="chip" data-per-row="2">2</button>
-        <button type="button" class="chip" data-per-row="3">3</button>
-        <button type="button" class="chip" data-per-row="4">4</button>
-      </div>
-      <div class="master-group">
-        <button type="button" class="chip" id="blind-toggle" title="Toggle blind mode (Cmd+B)">Blind mode · off</button>
-      </div>
     </div>
   </section>
 

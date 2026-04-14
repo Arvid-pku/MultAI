@@ -10,10 +10,10 @@ const LIBRARY_KEY = 'multai.library';
 const state = {
   crew: [...DEFAULT_CREW],
   selectedPreset: null,
-  master: { thinking: 'pane', tools: 'pane' },
   paneSettings: {},
   paneChat: {},
   benchCollapsed: false,
+  controlsCollapsed: false,
   maxPerRow: 3
 };
 
@@ -21,7 +21,6 @@ const panes = {};                 // { [providerId]: { iframe, ready, state } }
 let attachments = [];             // File[]
 let openChatPickerFor = null;
 let library = [];                 // [{ id, name, text }]
-let blindMode = false;
 
 const PANE_ORIGINS = new Set(PROVIDERS.map(p => p.origin));
 
@@ -68,11 +67,10 @@ async function saveLibrary() {
 function render() {
   renderCrew();
   renderPresets();
-  renderMaster();
   renderPerRow();
   renderGrid();
   renderBench();
-  applyBlindMode();
+  applyControlsCollapsed();
 }
 
 function renderCrew() {
@@ -102,14 +100,6 @@ function renderPresets() {
   }
 }
 
-function renderMaster() {
-  for (const chip of document.querySelectorAll('.chip[data-master]')) {
-    const key = chip.dataset.master;
-    const value = chip.dataset.value;
-    chip.classList.toggle('is-active', state.master[key] === value);
-  }
-}
-
 function renderPerRow() {
   const value = state.maxPerRow || 3;
   for (const chip of document.querySelectorAll('.chip[data-per-row]')) {
@@ -126,7 +116,6 @@ function renderPerRow() {
 
 function renderGrid() {
   const grid = document.getElementById('grid');
-  grid.classList.toggle('is-blind', blindMode);
   grid.classList.remove('is-dragging');
 
   // Remove placeholder from previous empty state
@@ -466,10 +455,23 @@ function selectPreset(id) {
   renderPresets();
 }
 
-function setMaster(key, value) {
-  state.master[key] = value;
+function toggleControls() {
+  state.controlsCollapsed = !state.controlsCollapsed;
   saveState();
-  renderMaster();
+  applyControlsCollapsed();
+}
+
+function applyControlsCollapsed() {
+  const controls = document.getElementById('controls');
+  if (controls) controls.classList.toggle('is-collapsed', !!state.controlsCollapsed);
+  const btn = document.getElementById('controls-toggle');
+  if (btn) {
+    const collapsed = !!state.controlsCollapsed;
+    btn.textContent = collapsed ? '▼' : '▲';
+    const label = collapsed ? 'Expand controls' : 'Collapse controls';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
 }
 
 function setMaxPerRow(value) {
@@ -489,6 +491,46 @@ async function newConversationAll() {
   }
   await Promise.allSettled(crew.map(id => newChatOn(id)));
   showBanner(`Started a new conversation in ${crew.length} pane${crew.length === 1 ? '' : 's'}.`);
+}
+
+function reloadPaneTo(providerId, url) {
+  const p = panes[providerId];
+  const provider = getProvider(providerId);
+  if (!p || !provider) return;
+  p.ready = false;
+  p.state = null;
+  if (p.fallback) p.fallback.hidden = true;
+  if (p.iframe) p.iframe.style.opacity = '';
+  if (provider.hasContentScript) {
+    p.iframe.addEventListener('load', () => wakePane(providerId), { once: true });
+    startReadyWatchdog(providerId);
+  }
+  p.iframe.src = url;
+  updatePaneHeader(providerId);
+}
+
+function newTemporaryChatAll() {
+  const crew = state.crew.slice();
+  if (crew.length === 0) {
+    showBanner('No active panes — activate a provider first.');
+    return;
+  }
+  const supported = [];
+  const unsupported = [];
+  for (const id of crew) {
+    const provider = getProvider(id);
+    if (!provider) continue;
+    if (provider.temporaryUrl) {
+      reloadPaneTo(id, provider.temporaryUrl);
+      supported.push(provider.label);
+    } else {
+      unsupported.push(provider.label);
+    }
+  }
+  const parts = [];
+  if (supported.length) parts.push(`Temporary chat: ${supported.join(', ')}`);
+  if (unsupported.length) parts.push(`Not supported: ${unsupported.join(', ')}`);
+  if (parts.length) showBanner(parts.join(' · '));
 }
 
 function reloadPane(providerId) {
@@ -728,27 +770,6 @@ async function saveCurrentPromptToLibrary() {
   showBanner(`Saved "${name.trim()}" to library.`);
 }
 
-/* ---------- Blind mode ---------- */
-
-function toggleBlind() {
-  blindMode = !blindMode;
-  applyBlindMode();
-}
-
-function applyBlindMode() {
-  const grid = document.getElementById('grid');
-  grid.classList.toggle('is-blind', blindMode);
-  const btn = document.getElementById('blind-toggle');
-  if (btn) {
-    btn.classList.toggle('is-active', blindMode);
-    btn.textContent = `Blind mode · ${blindMode ? 'on' : 'off'}`;
-  }
-  const paneEls = grid.querySelectorAll('.pane[data-provider]');
-  paneEls.forEach((p, i) => {
-    const title = p.querySelector('.pane-title');
-    if (title) title.setAttribute('data-blind-label', String.fromCharCode(65 + i));
-  });
-}
 
 /* ---------- Compare drawer ---------- */
 
@@ -787,7 +808,7 @@ async function refreshCompare() {
     const provider = getProvider(id);
     const col = document.createElement('div');
     col.className = 'compare-column';
-    const label = blindMode ? String.fromCharCode(65 + i) : provider.label;
+    const label = provider.label;
     const text = r.status === 'fulfilled' ? (r.value.text || '') : '';
     const error = r.status === 'rejected' ? String(r.reason?.message || r.reason) : null;
     col.innerHTML = `
@@ -850,7 +871,7 @@ async function quoteFromPane(providerId) {
     const res = await sendToPane(pane.iframe, provider.origin, { type: MSG.READ_SELECTION }, { timeoutMs: 3000 });
     const text = (res.text || '').trim();
     if (!text) { showBanner(`Nothing selected in ${provider.label}.`); return; }
-    const label = blindMode ? 'Pane' : provider.label;
+    const label = provider.label;
     const promptEl = document.getElementById('prompt');
     const prefix = promptEl.value.trim() ? promptEl.value.trimEnd() + '\n\n' : '';
     const quoted = text.split('\n').map(l => `> ${l}`).join('\n');
@@ -1061,16 +1082,14 @@ document.querySelector('[data-action="open-settings"]').addEventListener('click'
   chrome.runtime.openOptionsPage();
 });
 
-for (const chip of document.querySelectorAll('.chip[data-master]')) {
-  chip.addEventListener('click', () => setMaster(chip.dataset.master, chip.dataset.value));
-}
-
 for (const chip of document.querySelectorAll('.chip[data-per-row]')) {
   chip.addEventListener('click', () => setMaxPerRow(chip.dataset.perRow));
 }
 
 document.querySelector('[data-action="compare"]')?.addEventListener('click', openCompare);
 document.querySelector('[data-action="new-conversation"]')?.addEventListener('click', newConversationAll);
+document.querySelector('[data-action="new-temporary-chat"]')?.addEventListener('click', newTemporaryChatAll);
+document.getElementById('controls-toggle')?.addEventListener('click', toggleControls);
 
 document.getElementById('library-btn').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1080,7 +1099,6 @@ document.getElementById('library-btn').addEventListener('click', (e) => {
 document.getElementById('library-save').addEventListener('click', saveCurrentPromptToLibrary);
 document.getElementById('library-close').addEventListener('click', closeLibrary);
 
-document.getElementById('blind-toggle').addEventListener('click', toggleBlind);
 
 document.getElementById('compare-refresh').addEventListener('click', refreshCompare);
 document.getElementById('compare-export').addEventListener('click', exportCompareMarkdown);
@@ -1122,12 +1140,6 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     const popup = document.getElementById('library-popup');
     if (popup.hidden) openLibrary(); else closeLibrary();
-    return;
-  }
-  // Cmd+B: toggle blind mode
-  if ((e.key === 'b' || e.key === 'B') && !e.altKey && !e.shiftKey && !inInput) {
-    e.preventDefault();
-    toggleBlind();
     return;
   }
   // Cmd+Shift+C: open compare

@@ -16,10 +16,11 @@ body {
 
 .topbar {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding: var(--space-5) var(--space-7);
+  padding: var(--space-4) var(--space-7);
   border-bottom: 1px solid var(--divider);
+  gap: var(--space-5);
 }
 
 .brand {
@@ -54,8 +55,6 @@ body {
   color: var(--text-subtle);
   font-weight: 400;
 }
-
-.topnav { display: flex; gap: var(--space-2); }
 
 .link {
   background: none;
@@ -203,23 +202,6 @@ body {
   color: var(--text-button-on-accent);
   cursor: wait;
   opacity: 0.85;
-}
-
-/* ---- Master controls ---- */
-
-.master-row { align-items: center; }
-
-.master-group {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-right: var(--space-6);
-}
-
-.master-label {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-right: var(--space-2);
 }
 
 .chip {
@@ -744,22 +726,40 @@ body {
   z-index: 100;
 }
 
-/* ---- Blind mode ---- */
+/* ---- Controls fold ---- */
 
-.grid.is-blind .pane-title { visibility: hidden; position: relative; }
-.grid.is-blind .pane-title::after {
-  content: attr(data-blind-label);
-  visibility: visible;
-  position: absolute;
-  left: 0; top: 0;
-  color: var(--text);
-  font-family: var(--font-display);
-  font-weight: 500;
+.controls.is-collapsed { display: none; }
+
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
-.grid.is-blind .pane-settings dd[data-role="model"],
-.grid.is-blind .pane-settings dd[data-role="plan"] {
-  filter: blur(5px);
-  user-select: none;
+
+.topnav-per-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-left: 1px solid var(--divider);
+  border-right: 1px solid var(--divider);
+  margin: 0 var(--space-1);
+}
+
+.topnav-label {
+  font-size: 11px;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: var(--space-1);
+}
+
+.link.icon-only {
+  font-size: 11px;
+  padding: var(--space-1) var(--space-2);
+  min-width: 28px;
+  text-align: center;
 }
 
 /* ---- Prompt library popup ---- */
