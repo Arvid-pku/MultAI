@@ -398,6 +398,7 @@ function createPane(provider) {
         <span class="pane-title">${escapeHtml(provider.label)}</span>
         <div class="pane-actions">
           <span class="pane-status" data-role="status">loading</span>
+          <button type="button" class="pane-action" data-pane-action="judge" title="Ask this model to judge other models' responses">Judge</button>
           <button type="button" class="pane-action" data-pane-action="quote" title="Quote current selection from this pane">Quote</button>
           <button type="button" class="pane-action" data-pane-action="open-site" title="Open this chat in a new tab">Open</button>
           <button type="button" class="pane-action" data-pane-action="reload">Reload</button>
@@ -423,6 +424,7 @@ function createPane(provider) {
     </div>
   `;
 
+  pane.querySelector('[data-pane-action="judge"]').addEventListener('click', () => judgePane(provider.id));
   pane.querySelector('[data-pane-action="quote"]').addEventListener('click', () => quoteFromPane(provider.id));
   pane.querySelector('[data-pane-action="open-site"]').addEventListener('click', () => openPaneInTab(provider.id));
   pane.querySelector('[data-pane-action="reload"]').addEventListener('click', () => reloadPane(provider.id));
@@ -964,6 +966,71 @@ async function quoteFromPane(providerId) {
   } catch (err) {
     showBanner(`Quote failed for ${provider.label}: ${err.message || err}`);
   }
+}
+
+/* ---------- Judge ---------- */
+
+let isJudging = false;
+
+async function judgePane(providerId) {
+  if (isJudging || isBroadcasting) return;
+  const provider = getProvider(providerId);
+  const targetPane = panes[providerId];
+  if (!provider || !targetPane?.ready) {
+    showBanner(`${provider?.label || 'Pane'} isn't ready yet.`);
+    return;
+  }
+
+  const others = state.crew.filter(id => id !== providerId && panes[id]?.ready && getProvider(id));
+  if (others.length === 0) {
+    showBanner('Need at least one other ready pane to judge.');
+    return;
+  }
+
+  isJudging = true;
+  const judgeBtn = document.querySelector(`.pane[data-provider="${providerId}"] [data-pane-action="judge"]`);
+  if (judgeBtn) { judgeBtn.textContent = 'Judging…'; judgeBtn.disabled = true; }
+
+  const results = await Promise.allSettled(
+    others.map(async id => {
+      const p = getProvider(id);
+      const pane = panes[id];
+      const res = await sendToPane(pane.iframe, p.origin, { type: MSG.READ_LAST }, { timeoutMs: 6000 });
+      return { id, label: p.label, text: (res.text || '').trim() };
+    })
+  );
+
+  const responses = results
+    .filter(r => r.status === 'fulfilled' && r.value.text)
+    .map(r => r.value);
+
+  if (responses.length === 0) {
+    showBanner('Could not read any responses from the other panes.');
+    isJudging = false;
+    if (judgeBtn) { judgeBtn.textContent = 'Judge'; judgeBtn.disabled = false; }
+    return;
+  }
+
+  const sections = responses.map(r => `--- ${r.label} ---\n${r.text}`).join('\n\n');
+  const prompt =
+    'Given the following responses from different AI models, analyze them and determine ' +
+    'which response is the most correct and comprehensive. Explain your reasoning.\n\n' +
+    sections +
+    '\n\nBased on the above, what do you think is the most correct response? Please provide your analysis.';
+
+  try {
+    await sendToPane(targetPane.iframe, provider.origin, {
+      type: MSG.BROADCAST,
+      payload: { prompt, files: [] }
+    }, { timeoutMs: 120000 });
+    showBanner(`${provider.label} is now judging ${responses.length} response${responses.length === 1 ? '' : 's'}.`);
+  } catch (err) {
+    showBanner(`Judge failed for ${provider.label}: ${err.message || err}`);
+  }
+
+  isJudging = false;
+  if (judgeBtn) { judgeBtn.textContent = 'Judge'; judgeBtn.disabled = false; }
+  probePane(providerId);
 }
 
 let isBroadcasting = false;
