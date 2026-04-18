@@ -45,6 +45,15 @@
       'a[aria-label="New chat"]',
       'a[href="/"]'
     ],
+    temporaryIndicators: [
+      'h1',
+      'main',
+      '[role="main"]'
+    ],
+    temporaryToggle: [
+      'button[aria-label*="temporary chat" i]',
+      'button'
+    ],
     threadLinks: [
       'nav a[href^="/c/"]',
       'a[href^="/c/"]'
@@ -82,7 +91,30 @@
     await R.submit(input, S.sendButton);
   }
 
+  function isTemporaryChat() {
+    try {
+      const url = new URL(location.href);
+      if (url.searchParams.get('temporary-chat') === 'true') return true;
+    } catch (_) {
+      if (location.search.includes('temporary-chat=true')) return true;
+    }
+    const toggle = R.findFirst(S.temporaryToggle);
+    const toggleText = ((toggle?.innerText || toggle?.textContent || toggle?.getAttribute?.('aria-label') || '').trim().toLowerCase());
+    if (toggleText.includes('turn off temporary chat')) return true;
+    const indicators = R.findAll(S.temporaryIndicators);
+    return indicators.some((el) => {
+      const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+      return text.includes('temporary chat')
+        || text.includes("won't appear in history")
+        || text.includes('used to train our models');
+    });
+  }
+
   async function newChat() {
+    if (isTemporaryChat()) {
+      location.assign('https://chatgpt.com/?temporary-chat=true');
+      return;
+    }
     const link = R.findFirst(S.newChatLink);
     if (link) { link.click(); return; }
     location.assign('/');
