@@ -642,23 +642,48 @@ async function newConversationAll() {
   showBanner(`Started a new conversation in ${crew.length} pane${crew.length === 1 ? '' : 's'}.`);
 }
 
-function reloadPaneTo(providerId, url) {
-  const p = panes[providerId];
-  if (!p) return;
-  const oldSrc = p.iframe.src;
-  reloadPane(providerId, url);
-  // If only hash changed, reloadPane just set the src, but browser 
-  // won't fire 'load'. Force a real reload so wakePane triggers.
-  if (oldSrc && oldSrc.split('#')[0] === url.split('#')[0]) {
-    try {
-      p.iframe.contentWindow.location.reload();
-    } catch (_) {
-      p.iframe.src = url; // fallback
-    }
+async function getPaneCurrentUrl(providerId) {
+  const pane = panes[providerId];
+  const provider = getProvider(providerId);
+  if (!pane?.ready || !pane.iframe?.contentWindow || !provider?.hasContentScript) {
+    return pane?.iframe?.src || '';
+  }
+  try {
+    const res = await sendToPane(pane.iframe, provider.origin, { type: MSG.GET_URL }, { timeoutMs: 2000 });
+    return res.url || pane.iframe.src || '';
+  } catch (_) {
+    return pane.iframe.src || '';
   }
 }
 
-function newTemporaryChatAll() {
+async function reloadPaneTo(providerId, url) {
+  const p = panes[providerId];
+  if (!p) return;
+  const currentUrl = await getPaneCurrentUrl(providerId);
+
+  // Hash-only temporary chat toggles (Grok/Gemini) may not trigger a load
+  // event, and reloading can preserve the page's current non-temporary route.
+  // Navigate the iframe window directly so the site sees the target URL.
+  if (currentUrl && currentUrl.split('#')[0] === url.split('#')[0]) {
+    p.ready = false;
+    p.state = null;
+    if (p.fallback) p.fallback.hidden = true;
+    if (p.iframe) p.iframe.style.opacity = '';
+    updatePaneHeader(providerId);
+    if (getProvider(providerId)?.hasContentScript) startReadyWatchdog(providerId);
+    try {
+      p.iframe.contentWindow.location.replace(url);
+    } catch (_) {
+      p.iframe.src = url;
+    }
+    setTimeout(() => wakePane(providerId), 250);
+    return;
+  }
+
+  reloadPane(providerId, url);
+}
+
+async function newTemporaryChatAll() {
   const crew = state.crew.slice();
   if (crew.length === 0) {
     showBanner('No active panes — activate a provider first.');
@@ -666,16 +691,18 @@ function newTemporaryChatAll() {
   }
   const supported = [];
   const unsupported = [];
+  const tasks = [];
   for (const id of crew) {
     const provider = getProvider(id);
     if (!provider) continue;
     if (provider.temporaryUrl) {
-      reloadPaneTo(id, provider.temporaryUrl);
+      tasks.push(reloadPaneTo(id, provider.temporaryUrl));
       supported.push(provider.label);
     } else {
       unsupported.push(provider.label);
     }
   }
+  if (tasks.length) await Promise.allSettled(tasks);
   const parts = [];
   if (supported.length) parts.push(`Temporary chat: ${supported.join(', ')}`);
   if (unsupported.length) parts.push(`Not supported: ${unsupported.join(', ')}`);
